@@ -64,8 +64,6 @@ predictor = gene_id_complete[,2:17738] # 246 x 17737
 response = gene_id_complete[,17739] 
 ```
 
-
-
 ### QDA w PCA (using caret)
 
 ```{r}

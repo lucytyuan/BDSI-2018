@@ -1,0 +1,96 @@
+---
+title: "BDSI 2018"
+author: "Lucy"
+date: "5 July 2018"
+output: 
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+  html_document:
+    fig_height: 3
+    fig_width: 5
+  word_document:
+    fig_height: 3
+    fig_width: 5
+---
+
+```{r, setup, include=FALSE}
+require(mosaic)   # Load additional packages here 
+
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+trellis.par.set(theme=theme.mosaic()) # change default color scheme for lattice
+knitr::opts_chunk$set(
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+```
+
+### Reading in Data
+
+```{r message=F}
+# Update these for your own computer
+setwd("~/Documents/BDSI 2018/BDSI-2018/") # set working directory
+
+gene = readRDS("expression.rds")
+gdsc = readRDS("screening.rds")
+methylation = readRDS("methylation.rds")
+
+# set seed for randomization
+set.seed(2018)
+
+# additional libraries
+library(tidyverse); library(MASS); library(class)
+```
+
+### Subset by drug
+```{r}
+# select drug 1014
+id <- "1014"
+
+gdsc_id <- subset(gdsc, DRUG_ID_lib == id)[,c("CL","EFFECT")]
+gene_id <- gene[as.character(gdsc_id$CL),]
+gene_id_complete <- cbind(gdsc_id['CL'], gene_id,gdsc_id["EFFECT"])
+predictor = gene_id_complete[,2:17738] # 246 x 17737
+response = gene_id_complete[,17739] 
+```
+
+
+```{r}
+qda_pca <- function(num_pc = 3, num_validation = 10) {
+  for(qq in 1:num_pc) {
+      error_sum = 0
+      for (j in 1:num_validation) {
+        # select training data
+        train_id <- sample(1:nrow(predictor), 0.8*nrow(predictor))
+        predictor_train = predictor[train_id,]
+        response_train = response[train_id]
+        predictor_test = predictor[-train_id,]
+        response_test = response[-train_id]
+      
+        # center the data to prepare for PCA
+        center.train = scale(predictor_train)
+        center.test = scale(predictor_test)
+        pca <- prcomp(predictor_train)
+        rotation <- as.data.frame(pca$rotation)[,c(1:qq)]# rotational matrix, pick specific number of PCs
+        pca_train <- as.matrix(center.train) %*% as.matrix(rotation) # matrix multiplication
+        pca_test <- as.matrix(center.test) %*% as.matrix(rotation)
+      
+      
+        # lda
+        fit <- lda(pca_train, response_train)
+        out <- predict(fit, pca_test)
+        preds = out$class
+        error_sum = error_sum + mean(preds != response_test) # add up new testing error
+        
+      }
+      # store error rate
+      error = error_sum / num_validation
+      all_errors[qq] <- error
+    } 
+    all_errors # scores is the percentage predicted correctly
+  
+}
+```
+
+
+
+
