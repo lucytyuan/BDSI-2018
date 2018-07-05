@@ -1,7 +1,7 @@
 ---
-title: "Untitled"
-author: ""
-date: ""
+title: "BDSI 2018 DM Subgroup"
+author: "Hanna, Lucy, Mukai"
+date: "4 July 2018"
 output: 
   pdf_document:
     fig_height: 3
@@ -22,6 +22,111 @@ trellis.par.set(theme=theme.mosaic()) # change default color scheme for lattice
 knitr::opts_chunk$set(
   tidy=FALSE,     # display code as typed
   size="small")   # slightly smaller font for code
+
+#load necessary libraries
+library(tidyverse); library(ggplot2)
 ```
 
-Delete this sentence and enter your text here.
+# Prelim Analyses
+
+### Reading in Data
+
+```{r message=F}
+# Update these for your own computer
+setwd("~/Documents/BDSI 2018/BDSI-2018/") # set working directory
+
+gene = readRDS("expression.rds")
+gdsc = readRDS("screening.rds")
+
+# set seed for randomization
+set.seed(2018)
+
+# additional libraries
+library(MASS); library(class)
+```
+
+## Linear Discrininant Analysis
+
+Useful links - 
+* http://uc-r.github.io/discriminant_analysis
+
+
+### Subset by drug
+
+```{r}
+# select drug 1014
+gdsc_1014 <- subset(gdsc, DRUG_ID_lib == "1014")[,c("CL","EFFECT")]
+gene_1014 <- gene[as.character(gdsc_1014$CL),]
+gene_1014_complete <- cbind(gdsc_1014['CL'], gene_1014,gdsc_1014["EFFECT"])
+predictor = gene_1014_complete[,2:17738] # 246 x 17737
+response = gene_1014_complete[,17739] 
+```
+
+### Test w 1014 & 2 PC dimensions
+
+```{r}
+qq <- 2
+
+  # select training data
+  train_id <- sample(1:nrow(predictor), 0.8*nrow(predictor))
+  predictor_train = predictor[train_id,]
+  response_train = response[train_id]
+  predictor_test = predictor[-train_id,]
+  response_test = response[-train_id]
+
+  # center the data to prepare for PCA
+  center.train = scale(predictor_train)
+  center.test = scale(predictor_test)
+  pca <- prcomp(predictor_train)
+  rotation <- as.data.frame(pca$rotation)[,c(1:qq)]# rotational matrix, pick specific number of PCs
+  pca_train <- as.matrix(center.train) %*% as.matrix(rotation) # matrix multiplication
+  pca_test <- as.matrix(center.test) %*% as.matrix(rotation)
+
+
+# lda
+fit <- lda(pca_train, response_train)
+out <- predict(fit, pca_test); out
+preds = out$class
+mean(preds==response_test)
+```
+
+
+### Test w 1014 & 5 PC dimensions
+```{r}
+numPC <- 5
+scores <- rep(0, numPC)
+
+for(qq in 1:numPC) {
+  # select training data
+  train_id <- sample(1:nrow(predictor), 0.8*nrow(predictor))
+  predictor_train = predictor[train_id,]
+  response_train = response[train_id]
+  predictor_test = predictor[-train_id,]
+  response_test = response[-train_id]
+
+  # center the data to prepare for PCA
+  center.train = scale(predictor_train)
+  center.test = scale(predictor_test)
+  pca <- prcomp(predictor_train)
+  rotation <- as.data.frame(pca$rotation)[,c(1:qq)]# rotational matrix, pick specific number of PCs
+  pca_train <- as.matrix(center.train) %*% as.matrix(rotation) # matrix multiplication
+  pca_test <- as.matrix(center.test) %*% as.matrix(rotation)
+
+
+  # lda
+  fit <- lda(pca_train, response_train)
+  out <- predict(fit, pca_test); out
+  preds = out$class
+  score = mean(preds==response_test)
+  
+  # store accuracy
+  scores[qq] <- score
+} 
+scores # scores is the percentage predicted correctly
+```
+
+Note: need to add validation
+
+
+
+
